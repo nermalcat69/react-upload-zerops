@@ -98,7 +98,7 @@ export function UploadButton() {
             <button
                 onClick={handleUpload}
                 disabled={!file || isUploading}
-                className={`px-4 py-2 rounded-md ${
+                className={`px-4 py-2 ${
                     !file || isUploading 
                         ? 'bg-gray-300 cursor-not-allowed' 
                         : 'bg-blue-500 hover:bg-blue-600 text-white'
@@ -110,7 +110,7 @@ export function UploadButton() {
                 <div className="text-red-500 text-sm">{error}</div>
             )}
             {uploadedFile && (
-                <div className="mt-4 p-4 bg-green-50 rounded-md">
+                <div className="mt-4 p-4 bg-green-50">
                     <p className="text-green-600 mb-2">File uploaded successfully!</p>
                     <p className="text-sm text-gray-600 mb-1">Filename: {uploadedFile.name}</p>
                     <a 
