@@ -1,0 +1,20 @@
+zerops:
+  - setup: app
+    build:
+      base: nodejs@20
+      buildCommands:
+        - pnpm i
+        - pnpm build
+      deployFiles: /
+    run:
+      base: nodejs@20
+      envVariables:
+        VITE_STORAGE_URL: https://storage-prg1.zerops.io
+        VITE_ACCESS_KEY: ${storage_accessKeyId}
+        VITE_BUCKET_NAME: 4g7cu-storage
+        VITE_SECRET_KEY: ${storage_secretAccessKey}
+      ports:
+        - port: 3000
+          httpSupport: true
+      start: pnpm start
+      
