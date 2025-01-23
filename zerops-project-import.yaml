@@ -7,4 +7,7 @@ services:
   - hostname: app
     type: nodejs@20
     enableSubdomainAccess: true
-    buildFromGit: https://github.com/zeropsio/recipe-react-nodejs
+    buildFromGit: https://github.com/nermalcat69/react-upload-zerops
+  - hostname: storage
+    type: object-storage
+    objectStorageSize: 2
