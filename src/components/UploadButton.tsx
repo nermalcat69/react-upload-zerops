@@ -1,13 +1,43 @@
 import React, { useState, useRef } from 'react';
+import { useFiles } from '../context/FileContext';
 
 interface UploadedFile {
     name: string;
     url: string;
+    size: string;
 }
 
+const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const ExternalLinkIcon = () => (
+    <svg 
+        className="inline-block w-3.5 h-3.5 ml-1 -mt-0.5" 
+        fill="none" 
+        stroke="currentColor" 
+        viewBox="0 0 24 24" 
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path 
+            strokeLinecap="round" 
+            strokeLinejoin="round" 
+            strokeWidth={2} 
+            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" 
+        />
+    </svg>
+);
+
 export function UploadButton() {
+    const { addFile } = useFiles();
     const [file, setFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [uploadedSize, setUploadedSize] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [uploadedFile, setUploadedFile] = useState<UploadedFile | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -18,17 +48,12 @@ export function UploadButton() {
             setFile(selectedFile);
             setError(null);
             setUploadedFile(null);
+            setUploadProgress(0);
+            setUploadedSize(0);
         }
     };
 
     const constructStorageUrl = (filename: string): string => {
-        // Add debug logging
-        console.log('Environment Variables in UploadButton:', {
-            storageUrl: process.env.VITE_STORAGE_URL,
-            bucketName: process.env.VITE_BUCKET_NAME,
-            hasAccessKey: !!process.env.VITE_ACCESS_KEY
-        });
-
         const storageUrl = process.env.VITE_STORAGE_URL?.replace(/\/$/, '');
         const bucketName = process.env.VITE_BUCKET_NAME;
         
@@ -46,28 +71,54 @@ export function UploadButton() {
         if (!file) return;
         setIsUploading(true);
         setError(null);
+        setUploadProgress(0);
+        setUploadedSize(0);
 
         try {
-            // Generate unique filename
             const uniqueFileName = `${Date.now()}-${file.name}`;
             const url = constructStorageUrl(uniqueFileName);
 
-            console.log('Uploading to:', url); // Debug log
+            // Create XMLHttpRequest for upload with progress
+            const xhr = new XMLHttpRequest();
+            
+            // Setup upload progress handler
+            xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                    const progress = (event.loaded / event.total) * 100;
+                    setUploadProgress(Math.round(progress));
+                    setUploadedSize(event.loaded);
+                }
+            };
 
-            // Direct upload to object storage
-            const response = await fetch(url, {
-                method: 'PUT',
-                headers: {
-                    'x-api-key': process.env.ACCESS_KEY || '',
-                    'Content-Type': file.type,
-                },
-                body: file
+            // Create a promise to handle the XHR request
+            const uploadPromise = new Promise((resolve, reject) => {
+                xhr.onload = () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve(xhr.response);
+                    } else {
+                        reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`));
+                    }
+                };
+                xhr.onerror = () => reject(new Error('Upload failed'));
             });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Upload failed: ${response.status} ${errorText}`);
-            }
+            // Setup and send the request
+            xhr.open('PUT', url);
+            xhr.setRequestHeader('x-api-key', process.env.ACCESS_KEY || '');
+            xhr.setRequestHeader('Content-Type', file.type);
+            xhr.send(file);
+
+            // Wait for upload to complete
+            await uploadPromise;
+
+            const newFile = {
+                name: uniqueFileName,
+                url: url,
+                lastModified: new Date().toLocaleString(),
+                size: formatFileSize(file.size)
+            };
+
+            addFile(newFile);
 
             setFile(null);
             if (fileInputRef.current) {
@@ -75,16 +126,17 @@ export function UploadButton() {
             }
             setUploadedFile({
                 name: uniqueFileName,
-                url: url
+                url: url,
+                size: formatFileSize(file.size)
             });
-
-            console.log('File uploaded successfully:', uniqueFileName);
 
         } catch (error) {
             console.error('Upload error:', error);
             setError(error instanceof Error ? error.message : 'Upload failed');
         } finally {
             setIsUploading(false);
+            setUploadProgress(0);
+            setUploadedSize(0);
         }
     };
 
@@ -94,33 +146,54 @@ export function UploadButton() {
                 ref={fileInputRef}
                 type="file"
                 onChange={handleFileChange}
-                className="block w-full text-sm text-gray-500"
+                className="block w-full text-sm text-neutral-600"
+                disabled={isUploading}
             />
+            {file && !isUploading && !uploadedFile && (
+                <div className="text-sm text-neutral-700">
+                    Selected file: {file.name} ({formatFileSize(file.size)})
+                </div>
+            )}
             <button
                 onClick={handleUpload}
                 disabled={!file || isUploading}
-                className={`px-4 py-2 ${
+                className={`px-4 py-2 relative ${
                     !file || isUploading 
-                        ? 'bg-gray-300 cursor-not-allowed' 
-                        : 'bg-blue-500 hover:bg-blue-600 text-white'
+                        ? 'bg-neutral-200 text-neutral-500 cursor-not-allowed' 
+                        : 'bg-neutral-900 hover:bg-neutral-800 text-white'
                 }`}
             >
-                {isUploading ? 'Uploading...' : 'Upload'}
+                {isUploading ? (
+                    <div className="flex items-center justify-center">
+                        <div className="flex items-center space-x-2">
+                            <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                            <span>
+                                Uploading... {uploadProgress}% 
+                                ({formatFileSize(uploadedSize)} of {file ? formatFileSize(file.size) : '0 B'})
+                            </span>
+                        </div>
+                    </div>
+                ) : 'Upload'}
             </button>
             {error && (
                 <div className="text-red-500 text-sm">{error}</div>
             )}
             {uploadedFile && (
-                <div className="mt-4 p-4 bg-green-50">
-                    <p className="text-green-600 mb-2">File uploaded successfully!</p>
-                    <p className="text-sm text-gray-600 mb-1">Filename: {uploadedFile.name}</p>
+                <div className="mt-4 p-4 bg-neutral-50 border border-neutral-200">
+                    <p className="text-neutral-900 mb-2">File uploaded successfully!</p>
+                    <p className="text-sm text-neutral-700 mb-1">
+                        Filename: {uploadedFile.name}
+                        <br />
+                        Size: {uploadedFile.size}
+                    </p>
                     <a 
                         href={uploadedFile.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-blue-500 hover:text-blue-700 underline text-sm"
+                        className="text-neutral-800 hover:text-neutral-900 transition-colors inline-flex items-center"
                     >
                         View uploaded file
+                        <ExternalLinkIcon />
                     </a>
                 </div>
             )}
