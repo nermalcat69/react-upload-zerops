@@ -22,10 +22,11 @@ export function UploadButton() {
     };
 
     const constructStorageUrl = (filename: string): string => {
-        console.log('Environment Variables:', {
+        // Add debug logging
+        console.log('Environment Variables in UploadButton:', {
             storageUrl: process.env.VITE_STORAGE_URL,
             bucketName: process.env.VITE_BUCKET_NAME,
-            accessKey: process.env.VITE_ACCESS_KEY?.substring(0, 5) + '...' // Log only first 5 chars for security
+            hasAccessKey: !!process.env.VITE_ACCESS_KEY
         });
 
         const storageUrl = process.env.VITE_STORAGE_URL?.replace(/\/$/, '');
@@ -57,7 +58,7 @@ export function UploadButton() {
             const response = await fetch(url, {
                 method: 'PUT',
                 headers: {
-                    'x-api-key': process.env.VITE_ACCESS_KEY || '',
+                    'x-api-key': process.env.ACCESS_KEY || '',
                     'Content-Type': file.type,
                 },
                 body: file

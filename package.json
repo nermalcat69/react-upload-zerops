@@ -17,6 +17,7 @@
         "cors": "^2.8.5",
         "crypto": "^1.0.1",
         "crypto-js": "^4.2.0",
+        "dotenv": "^16.4.7",
         "express": "^4.19.2",
         "multer": "1.4.5-lts.1",
         "postcss": "^8.4.39",

@@ -13,16 +13,35 @@ export function Feed() {
 
     const fetchFiles = async () => {
         try {
-            const response = await fetch(
-                `${process.env.VITE_STORAGE_URL}/${process.env.VITE_BUCKET_NAME}/?list-type=2`, 
-                {
-                    headers: {
-                        'x-api-key': process.env.VITE_ACCESS_KEY!,
-                    }
-                }
-            );
+            const storageUrl = process.env.VITE_STORAGE_URL;
+            const bucketName = process.env.VITE_BUCKET_NAME;
+            const accessKey = process.env.VITE_ACCESS_KEY;
 
-            if (!response.ok) throw new Error('Failed to fetch files');
+            if (!storageUrl || !bucketName) {
+                throw new Error(`Storage configuration is missing:
+                    Storage URL: ${storageUrl ? 'OK' : 'Missing'}
+                    Bucket Name: ${bucketName ? 'OK' : 'Missing'}`
+                );
+            }
+
+            const url = `${storageUrl}/${bucketName}/?list-type=2`;
+            console.log('Fetching from:', url);
+
+            const response = await fetch(url, {
+                headers: {
+                    'x-api-key': accessKey || '',
+                }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Fetch error:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    errorText
+                });
+                throw new Error(`Failed to fetch files: ${response.status} ${errorText}`);
+            }
 
             const xmlText = await response.text();
             const parser = new DOMParser();
@@ -32,20 +51,19 @@ export function Feed() {
             const fileList: StorageFile[] = Array.from(contents).map(content => {
                 const key = content.getElementsByTagName('Key')[0]?.textContent || '';
                 const lastModified = content.getElementsByTagName('LastModified')[0]?.textContent || '';
-                const url = `${process.env.VITE_STORAGE_URL}/${process.env.VITE_BUCKET_NAME}/${key}`;
+                const fileUrl = `${storageUrl}/${bucketName}/${key}`;
                 
                 return {
                     name: key,
-                    url,
+                    url: fileUrl,
                     lastModified: new Date(lastModified).toLocaleString(),
                 };
-            }).sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
-              .slice(0, 5);
+            }).sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
 
             setFiles(fileList);
         } catch (err) {
             console.error('Error fetching files:', err);
-            setError('Failed to load files');
+            setError(err instanceof Error ? err.message : 'Failed to load files');
         } finally {
             setLoading(false);
         }
@@ -55,7 +73,7 @@ export function Feed() {
         try {
             const response = await fetch(url, {
                 headers: {
-                    'x-api-key': process.env.VITE_ACCESS_KEY!,
+                    'x-api-key': process.env.VITE_ACCESS_KEY || '',
                 }
             });
 

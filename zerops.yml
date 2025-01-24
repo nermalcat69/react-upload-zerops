@@ -2,6 +2,11 @@ zerops:
   - setup: app
     build:
       base: nodejs@20
+      envVariables:
+        VITE_STORAGE_URL: https://storage-prg1.zerops.io
+        VITE_ACCESS_KEY: ${storage_accessKeyId}
+        VITE_BUCKET_NAME: ${storage_bucketName}
+        VITE_SECRET_KEY: ${storage_secretAccessKey}
       buildCommands:
         - pnpm i
         - pnpm build
